@@ -1,0 +1,282 @@
+---
+title: "Beyesian Logistic Regression Model To Predict Patients Diabetes"
+author: "Daisy Shi"
+date: "10/14/2021"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+# Introduction
+
+Based on the uncertainty problems in machine learning, it is an effective method to use probability to quantify the uncertainty in the inference of statistical data analysis. The Bayesian approach allows us to make a prior good guess of the intercept and slope, based on our real-life domain knowledge and common sense. In this study, I am interested in build a Bayesian Logistic Regression model to predict whether or not the patients in the dataset have diabetes or not. 
+
+
+# Data Description
+
+This dataset is originally from the National Institute of Diabetes and Digestive and Kidney Diseases. Total 768 observation and 9 variables, after removing those observation rows with 0 in any of the variables, our study contains 392 observations.  The objective of the dataset is to diagnostically predict whether or not a patient has diabetes, based on certain diagnostic measurements included in the dataset. Several constraints were placed on the selection of these instances from a larger database. In particular, all patients here are females at least 21 years old of Pima Indian heritage.
+
+The datasets consist of several medical predictor (independent) variables and one target (dependent) variable, Outcome. Independent variables include the number of pregnancies the patient has had, their BMI, insulin level, age, and so on.
+
+# Methods and data diagnostics
+
+In general, there are four steps of a Bayesian analysis in this study. 
+
+1. Specify a joint distribution for the outcome(s) and all the unknowns, which typically takes the form of a marginal prior distribution for the unknowns multiplied by a likelihood for the outcome(s) conditional on the unknowns. This joint distribution is proportional to a posterior distribution of the unknowns conditional on the observed data.
+
+2. Draw from posterior distribution using Markov Chain Monte Carlo (MCMC).
+
+3. Evaluate how well the model fits the data and possibly revise the model.
+
+4. Draw from the posterior predictive distribution of the outcome(s) given interesting values of the predictors in order to visualize how a manipulation of a predictor affects (a function of) the outcome(s).
+
+### Likelihood
+For a binomial GLM the likelihood for one observation  y  can be written as a conditionally binomial PMF.
+
+where  n  is the known number of trials,  π=g−1(η)  is the probability of success and  η=α+x⊤β  is a linear predictor. For a sample of size  N , the likelihood of the entire sample is the product of  N  individual likelihood contributions.
+
+Because  π  is a probability, for a binomial model the link function  g  maps between the unit interval (the support of  π ) and the set of all real numbers  ℝ . When applied to a linear predictor  η  with values in  ℝ , the inverse link function  g−1(η)  therefore returns a valid probability between 0 and 1.
+
+The two most common link functions used for binomial GLMs are the logit and probit functions. With the logit (or log-odds) link function  g(x)=ln(x1−x) , the likelihood for a single observation becomes
+
+
+
+
+
+### Posterior
+
+With independent prior distributions, the joint posterior distribution for  α  and  β  is proportional to the product of the priors and the  N  likelihood contributions
+
+```{r,echo=FALSE, warning=FALSE, results='hide',message=FALSE}
+library(ggplot2)
+
+#https://www.kaggle.com/avehtari/bayesian-logistic-regression-with-rstanarm
+#  https://cran.r-project.org/web/packages/rstanarm/vignettes/rstanarm.html
+
+diabetes<- read.csv("/学习课件/STA545 Baysian/diabetes.csv",header = TRUE)
+summary(diabetes)
+str(diabetes)  #768 obs. of  9 variables
+diabetes$Outcome <- factor(diabetes$Outcome)
+
+# removing those observation rows with 0 in any of the variables
+for (i in 2:6) {
+  diabetes <- diabetes[-which(diabetes[, i] == 0), ]
+}
+
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+  
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+  
+  numPlots = length(plots)
+  
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                     ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+  
+  if (numPlots==1) {
+    print(plots[[1]])
+    
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+    
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+      
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+
+
+
+
+a<-ggplot(diabetes,aes(Pregnancies,fill=Outcome))+  geom_density(alpha = 0.3,adjust = 5) +plot_title
+b<-ggplot(diabetes,aes(Glucose,fill=Outcome))+  geom_density(alpha = 0.3,adjust = 5) 
+c<-ggplot(diabetes,aes(BloodPressure,fill=Outcome))+  geom_density(alpha = 0.3,adjust = 5) 
+d<-ggplot(diabetes,aes(SkinThickness,fill=Outcome))+  geom_density(alpha = 0.3,adjust = 5) 
+e<-ggplot(diabetes,aes(Insulin,fill=Outcome))+  geom_density(alpha = 0.3,adjust = 5) 
+f<-ggplot(diabetes,aes(BMI,fill=Outcome))+  geom_density(alpha = 0.3,adjust = 5) 
+g<-ggplot(diabetes,aes(DiabetesPedigreeFunction,fill=Outcome))+  geom_density(alpha = 0.3,adjust = 5) 
+h<-ggplot(diabetes,aes(Age,fill=Outcome))+  geom_density(alpha = 0.3,adjust = 5) 
+
+plot_title<- ggtitle("Figure 1", 
+                     "Density plots for all attributes")
+
+MULTI<-multiplot(a,b,c,d,e,f,g,h,cols=2)
+
+
+
+
+
+
+# scale the covariates for easier comparison of coefficient posteriors
+for (i in 1:8) {
+  diabetes[i] <- scale(diabetes[i])
+}
+
+# modify the data column names slightly for easier typing
+
+names(diabetes) <- tolower(names(diabetes))
+
+n=dim(diabetes)[1]
+p=dim(diabetes)[2]
+str(diabetes)
+print(paste0("number of observations = ", n))
+print(paste0("number of predictors = ", p))
+
+# preparing the inputs
+x <- model.matrix(outcome ~ . - 1, data = diabetes)
+y <- diabetes$outcome
+
+library(rstanarm)
+options(mc.cores = parallel::detectCores())
+
+prior = normal(0,1)
+#t_prior <- student_t(df = 7, location = 0, scale = 2.5)
+post1 <- stan_glm(outcome ~ ., data = diabetes,
+                  family = binomial(link = "logit"), 
+                  prior = prior, prior_intercept = prior, QR=TRUE,
+                  seed = 14124869)
+#Priors
+
+# A full Bayesian analysis requires specifying prior distributions 𝑓(𝛼) and 𝑓(𝜷) for the intercept and vector of regression coefficients. we have 8 predictors and believe — prior to seeing the data, and we believe that 𝛼,𝛽1,…,𝛽𝐾 are as likely to be positive as they are to be negative, but are highly unlikely to be far from zero. These beliefs can be represented by normal distributions with mean zero and a small scale (standard deviation). 
+
+
+
+library(ggplot2)
+pplot<-plot(post1, "areas", prob = 0.95, prob_outer = 1)
+round(posterior_interval(post1, prob = 0.95), 2)
+```
+
+# Main Results 
+
+Student t prior with 7 degrees of freedom and a scale of 2.5 are used in the model, and it is a reasonable default prior when coefficients should be close to zero but have some chance of being large. The model returns the posterior distribution for the parameters describing the uncertainty related to unknown parameter values.  
+
+```{r,echo=FALSE, warning=FALSE,message=FALSE}
+plot_title <- ggtitle("Posterior distributions",
+                      "with medians and 95% intervals")
+pplot+ geom_vline(xintercept = 0) + plot_title 
+```
+
+The uncertainty intervals are computed by finding the relevant quantiles of the draws from the posterior distribution.  
+
+We got a corresponding posterior median estimates as follows:
+
+```{r,echo=FALSE, warning=FALSE,message=FALSE}
+round(coef(post1), 1)
+```
+
+95% CI we got results we follows:
+
+```{r,echo=FALSE, warning=FALSE,message=FALSE}
+round(posterior_interval(post1, prob = 0.95), 2)
+```
+Using Pareto smoothed leave-one-out cross-validation (PSIS-LOO) to compute expected log predictive density. Computed from 4000 by 392 log-likelihood matrix, we see that PSIS-LOO result is reliable as all Pareto k estimates are small (k< 0.5) and Monte Carlo SE of elpd_loo is 0.1. By build a baseline model without covariates and to compare with the PSIS-LOO model, we see that covariates contain clearly useful information for predictions. The most common metric used to evaluate the performance of a classification predictive model is classification accuracy. Typically, the accuracy of a predictive model is good (above 90% accuracy), therefore it is also very common to summarize the performance of a model in terms of the error rate of the model. In this study, the posterior classification accuracy is 0.78, it indicates the model performance is fair. 
+
+
+
+
+```{r,echo=FALSE, warning=FALSE,message=FALSE}
+library(loo)
+loo1 <- loo(post1, save_psis = TRUE)
+post0 <- update(post1, formula = outcome ~ 1, QR = FALSE)#Compute baseline result without covariates.
+loo0 <- loo(post0)
+compare<- rstanarm::compare_models(loo0,loo1)
+
+
+# Predicted probabilities
+linpred <- posterior_linpred(post1)
+preds <- posterior_linpred(post1, transform=TRUE)
+pred <- colMeans(preds)
+
+pr <- as.integer(pred >= 0.5)
+table(pr,y)
+(233+74)/(233+56+29+74)
+mean(pr==y)
+mean(pr!=y)
+# posterior classification accuracy is 0.7831633,which means 0.2168367 is the error. 
+
+
+   
+# confusion matrix
+caret::confusionMatrix(as.factor(as.numeric(pr>0.5)), y)[2]
+# posterior classification accuracy
+round(mean(xor(pr,as.integer(y==0))),2)
+# posterior balanced classification accuracy
+round((mean(xor(pr[y==0]>0.5,as.integer(y[y==0])))+mean(xor(pr[y==1]<0.5,as.integer(y[y==1]))))/2,2)
+# PSIS-LOO weights
+log_lik=log_lik(post1, parameter_name = "log_lik")
+psis=psislw(-log_lik)
+#plot(psis$pareto_k)
+#plot(psis$lw_smooth[,1],linpred[,1])
+# LOO predictive probabilities
+ploo=colSums(preds*exp(psis$lw_smooth))
+# LOO classification accuracy
+round(mean(xor(ploo>0.5,as.integer(y==0))),2)
+# LOO balanced classification accuracy
+round((mean(xor(ploo[y==0]>0.5,as.integer(y[y==0])))+mean(xor(ploo[y==1]<0.5,as.integer(y[y==1]))))/2,2)
+plot(pred,ploo)
+
+calPlotData<-caret::calibration(y ~ pred + loopred, 
+                         data = data.frame(pred=pred,loopred=ploo,y=y), 
+                         cuts=10, class="1")
+plot_title1 <- ggtitle("Posterior Predictive Intervals \nvs Observed Event Percentage"
+                    )
+ggplot(calPlotData, auto.key = list(columns = 2))+plot_title1
+
+library(splines)
+library(MASS)
+ggplot(data = data.frame(pred=pred,loopred=ploo,y=as.numeric(y)-1), aes(x=loopred, y=y)) + 
+    stat_smooth(method='glm', formula = y ~ ns(x, 5), fullrange=TRUE) + 
+    geom_abline(linetype = 'dashed') + ylab(label = "Observed") + xlab(label = "Predicted (LOO)") + 
+    geom_jitter(height=0.03, width=0) + scale_y_continuous(breaks=seq(0,1,by=0.1)) + xlim(c(0,1))
+
+
+
+p0 <- 2 # prior guess for the number of relevant variables
+tau0 <- p0/(p-p0) * 1/sqrt(n)
+hs_prior <- hs(df=1, global_df=1, global_scale=tau0)
+t_prior <- student_t(df = 7, location = 0, scale = 2.5)
+post2 <- stan_glm(outcome ~ ., data = diabetes,
+                 family = binomial(link = "logit"), 
+                 prior = hs_prior, prior_intercept = t_prior,
+                 seed = 14124869, adapt_delta = 0.999)
+
+loo2 <- loo(post2, save_psis = TRUE)
+
+
+pplot<-plot(post2, "areas", prob = 0.9, prob_outer = 1)
+pplot + geom_vline(xintercept = 0)
+
+# Predicted probabilities
+linpred2 <- posterior_linpred(post2)
+preds2 <- posterior_linpred(post2, transform=TRUE)
+pred2 <- colMeans(preds2)
+
+pr2 <- as.integer(pred2 >= 0.5)
+table(pr2,y)
+(233+74)/(233+56+29+74)
+mean(pr2==y)
+mean(pr2!=y)
+
+library(bayesplot)
+mcmc_pairs(as.array(post2),pars = c("pregnancies","age","bmi"))
+
+```
+
+# Conclusion 
+
+Bayesian logistic regression is not an algorithm, but a different method of statistical inference. The main advantage is that, with Bayesian processing, you can recover the entire range of extrapolation understanding, rather than the point estimates and confidence intervals found in traditional regression. Using Bayesian approach to predict the probability of developing diabetes, the model was accurate 78% of the time. Meanwhile, all the variables in the model were significant (P <0.05%), the point estimates reported coefficient for this predictor suggests that there was a negative coefficient with insulin and blood pressure, it indicated that the higher the insulin and high pressure, the less likely they were to develop diabetes. In addition, we have strong evidence that the Bayesian logistic regression model has reasonable performance.
+
