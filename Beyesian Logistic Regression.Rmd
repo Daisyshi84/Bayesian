@@ -50,8 +50,6 @@ With independent prior distributions, the joint posterior distribution for  α  
 ```{r,echo=FALSE, warning=FALSE, results='hide',message=FALSE}
 library(ggplot2)
 
-#https://www.kaggle.com/avehtari/bayesian-logistic-regression-with-rstanarm
-#  https://cran.r-project.org/web/packages/rstanarm/vignettes/rstanarm.html
 
 diabetes<- read.csv("/学习课件/STA545 Baysian/diabetes.csv",header = TRUE)
 summary(diabetes)
